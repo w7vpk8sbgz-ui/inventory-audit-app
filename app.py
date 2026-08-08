@@ -10,7 +10,7 @@
  장기 운영 시엔 Google Sheets(gspread) 연동으로 교체 권장 — 하단 주석 참고)
 
 실행:
-    pip install streamlit pandas openpyxl
+    pip install streamlit pandas openpyxl plotly
     streamlit run app.py
 """
 
@@ -19,6 +19,7 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
+import plotly.express as px
 
 LEDGER_PATH = "장부재고.xlsx"
 RECORD_PATH = "실사기록.csv"
@@ -220,7 +221,27 @@ elif page == "진행률":
         item_progress_df = pd.merge(ledger[["품목코드", "품목명", "장부수량"]], item_counted, on="품목코드", how="left")
         item_progress_df["실사수량"] = item_progress_df["실사수량"].fillna(0)
         item_progress_df["진행률(%)"] = (item_progress_df["실사수량"] / item_progress_df["장부수량"] * 100).round(1)
-        st.dataframe(item_progress_df, use_container_width=True)
+        item_progress_df["진행률(캡100%)"] = item_progress_df["진행률(%)"].clip(upper=100)
+
+        chart_df = item_progress_df.sort_values("진행률(%)")
+        fig = px.bar(
+            chart_df,
+            x="진행률(캡100%)",
+            y="품목명",
+            orientation="h",
+            text=chart_df["진행률(%)"].astype(str) + "%",
+            range_x=[0, 100],
+            color="진행률(캡100%)",
+            color_continuous_scale=["#F8CBAD", "#FFF2CC", "#E2EFDA"],
+        )
+        fig.update_layout(
+            xaxis_title="진행률 (%)", yaxis_title="",
+            coloraxis_showscale=False, height=80 + 40 * len(chart_df),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        with st.expander("표로 보기"):
+            st.dataframe(item_progress_df.drop(columns=["진행률(캡100%)"]), use_container_width=True)
     else:
         st.info("아직 입력된 실사 기록이 없습니다.")
 
